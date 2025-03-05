@@ -18,13 +18,13 @@ mongoose.connect(process.env.MONGO_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error(err));
 
-// Student Attendance Schema with Unique Index
+// Student Attendance Schema with Unique Constraints
 const studentSchema = new mongoose.Schema({
   name: String,
   year: String,
   department: String,
-  phone: { type: String, unique: true }, // Ensures phone is unique
-  email: { type: String, unique: true }, // Ensures email is unique
+  phone: { type: String, unique: true },
+  email: { type: String, unique: true },
   institute: String,
 }, { timestamps: true });
 
@@ -35,18 +35,20 @@ app.post('/submit', async (req, res) => {
   try {
     const { name, year, department, phone, email, institute } = req.body;
 
-    // Check if a student with the same email or phone already exists
-    const existingStudent = await Student.findOne({ $or: [{ email }, { phone }] });
-    if (existingStudent) {
-      return res.status(400).json({ error: 'User already registered!' });
-    }
-
-    // Save the new student record
+    // Create a new student record directly and handle duplicate error efficiently
     const newStudent = new Student({ name, year, department, phone, email, institute });
-    await newStudent.save();
-    res.status(201).json({ message: 'Attendance submitted successfully!' });
+
+    await newStudent.save()
+      .then(() => res.status(201).json({ message: 'Attendance submitted successfully!' }))
+      .catch((err) => {
+        if (err.code === 11000) {
+          return res.status(400).json({ error: 'User already registered!' });
+        }
+        throw err; // Forward other errors
+      });
 
   } catch (err) {
+    console.error("Error submitting attendance:", err);
     res.status(500).json({ error: err.message });
   }
 });
